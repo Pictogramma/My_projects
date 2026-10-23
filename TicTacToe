@@ -1,0 +1,305 @@
+import java.util.HashMap;
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Введите свое имя, Фрилансер:");
+        String name = scanner.nextLine().toUpperCase();
+
+        FleshCrossBlood game = new FleshCrossBlood(3, name);
+
+        game.chance();
+        game.printBoard();
+
+        while (!game.checkWin() && !game.isDraw()) {
+            if (game.isPlayerTurn) {
+                game.letsGoIntoPlay();
+            } else {
+                game.makeBotMove();
+            }
+            game.printBoard();
+            game.isPlayerTurn = !game.isPlayerTurn;
+        }
+
+        if (game.checkWin()) {
+            boolean isOdd = (game.movesCount % 2 != 0);
+            if (game.computerStarted) {
+                if (isOdd) {
+                    System.out.println("Deus Ex Machina is the champion, " + name + " is loser!");
+                } else {
+                    System.out.println(name + " is the champion, Deus Ex Machina is loser!");
+                }
+            } else {
+                if (isOdd) {
+                    System.out.println(name + " is the champion, Deus Ex Machina is loser!");
+                } else {
+                    System.out.println("Deus Ex Machina is the champion, " + name + " is loser!");
+                }
+            }
+        } else {
+            System.out.println("Peace, Friendship, Bubblegum!");
+        }
+
+    }
+}
+
+interface Game {
+    void chance();
+    void letsGoIntoPlay();
+    void makeBotMove();
+    boolean checkWin();
+    boolean isDraw();
+}
+
+class FleshCrossBlood implements Game {
+    private Board board;
+    private Freelancer freelancer;
+    private DeusExMachina machina;
+    public boolean isPlayerTurn;
+    public boolean computerStarted;
+    public int movesCount;
+    private HashMap<String, K> coordinateMap;
+    private Scanner scanner;
+
+    public FleshCrossBlood(int size, String playerName) {
+        this.board = new Board(size);
+        this.freelancer = new Freelancer(playerName, 'X');
+        this.machina = new DeusExMachina('O');
+        this.movesCount = 0;
+        this.scanner = new Scanner(System.in);
+        initCoordinateMap();
+    }
+
+    private void initCoordinateMap() {
+        coordinateMap = new HashMap<>();
+        coordinateMap.put("A1", new K(0, 0));
+        coordinateMap.put("B1", new K(0, 1));
+        coordinateMap.put("C1", new K(0, 2));
+        coordinateMap.put("A2", new K(1, 0));
+        coordinateMap.put("B2", new K(1, 1));
+        coordinateMap.put("C2", new K(1, 2));
+        coordinateMap.put("A3", new K(2, 0));
+        coordinateMap.put("B3", new K(2, 1));
+        coordinateMap.put("C3", new K(2, 2));
+    }
+
+    @Override
+    public void chance() {
+        System.out.println("Выбери орел (1) или решка (0):");
+        int choice = scanner.nextInt();
+        scanner.nextLine();
+
+        System.out.println("Подкидываю монетку...");
+        int n = (int)(Math.random() * 100);
+        int coin = n - (n / 2) * 2;
+        String resultName = (coin == 1) ? "Орел" : "Решка";
+
+        if (coin == choice) {
+            System.out.println("Выпал " + resultName + ". Твой ход!");
+            this.isPlayerTurn = true;
+            this.computerStarted = false;
+        } else {
+            System.out.println("Выпал " + resultName + ". Мой ход!");
+            this.isPlayerTurn = false;
+            this.computerStarted = true;
+        }
+    }
+
+    @Override
+    public void letsGoIntoPlay() {
+        System.out.println("Твой ход, " + freelancer.getName() + ". Введи координаты (например, B2):");
+
+        String input = scanner.nextLine();
+
+        String cleanInput = input.toUpperCase().replace(" ", "");
+
+        K move = coordinateMap.get(cleanInput);
+
+        if (move == null) {
+            System.out.println("Ты ввел неправильные координаты! Где мой канделябр?");
+            System.exit(0);
+        }
+
+        char[][] field = board.getField();
+        if (field[move.getX()][move.getY()] != '*') {
+            System.out.println("Клетка уже занята! Где мой канделябр?");
+            System.exit(0);
+        }
+
+        field[move.getX()][move.getY()] = freelancer.getSymbol();
+        movesCount++;
+        System.out.println(freelancer.getName() + " ставит " + freelancer.getSymbol() + " в " + cleanInput);
+    }
+
+    @Override
+    public void makeBotMove() {
+        char[][] field = board.getField();
+        char botSym = machina.getSymbol();
+        char playerSym = freelancer.getSymbol();
+
+        K winningMove = findWinningLine(botSym);
+        if (winningMove != null) {
+            field[winningMove.getX()][winningMove.getY()] = botSym;
+            System.out.println("Deus Ex Machina выигрывает, ставя " + botSym + " в " + getCoordName(winningMove));
+            movesCount++;
+            return;
+        }
+
+        K blockingMove = findWinningLine(playerSym);
+        if (blockingMove != null) {
+            field[blockingMove.getX()][blockingMove.getY()] = botSym;
+            System.out.println("Deus Ex Machina блокирует ход " + playerSym + " в " + getCoordName(blockingMove));
+            movesCount++;
+            return;
+        }
+
+        if (field[1][1] == '*') {
+            field[1][1] = botSym;
+            System.out.println("Deus Ex Machina занимает центр.");
+        } else {
+            int[][] corners = {{0, 0}, {0, 2}, {2, 0}, {2, 2}};
+            boolean placed = false;
+            for (int[] corner : corners) {
+                if (field[corner[0]][corner[1]] == '*') {
+                    field[corner[0]][corner[1]] = botSym;
+                    System.out.println("Deus Ex Machina занимает угол.");
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                int[][] sides = {{0, 1}, {1, 0}, {1, 2}, {2, 1}};
+                for (int[] side : sides) {
+                    if (field[side[0]][side[1]] == '*') {
+                        field[side[0]][side[1]] = botSym;
+                        System.out.println("Deus Ex Machina занимает ребро.");
+                        break;
+                    }
+                }
+            }
+        }
+        movesCount++;
+    }
+
+    private K findWinningLine(char symbol) {
+        char[][] field = board.getField();
+        int[][] lines = {
+            {0, 0, 0, 1, 0, 2}, {1, 0, 1, 1, 1, 2}, {2, 0, 2, 1, 2, 2},
+            {0, 0, 1, 0, 2, 0}, {0, 1, 1, 1, 2, 1}, {0, 2, 1, 2, 2, 2},
+            {0, 0, 1, 1, 2, 2}, {0, 2, 1, 1, 2, 0}
+        };
+        for (int[] line : lines) {
+            int count = 0;
+            int emptyX = -1, emptyY = -1;
+            for (int i = 0; i < 6; i += 2) {
+                int x = line[i];
+                int y = line[i + 1];
+                if (field[x][y] == symbol) count++;
+                else if (field[x][y] == '*') {
+                    emptyX = x;
+                    emptyY = y;
+                } else {
+                    count = -1;
+                    break;
+                }
+            }
+            if (count == 2 && emptyX != -1) return new K(emptyX, emptyY);
+        }
+        return null;
+    }
+
+    @Override
+    public boolean checkWin() {
+        char[][] f = board.getField();
+        if (f[0][0] != '*' && f[0][0] == f[0][1] && f[0][1] == f[0][2]) return true;
+        if (f[1][0] != '*' && f[1][0] == f[1][1] && f[1][1] == f[1][2]) return true;
+        if (f[2][0] != '*' && f[2][0] == f[2][1] && f[2][1] == f[2][2]) return true;
+        if (f[0][0] != '*' && f[0][0] == f[1][0] && f[1][0] == f[2][0]) return true;
+        if (f[0][1] != '*' && f[0][1] == f[1][1] && f[1][1] == f[2][1]) return true;
+        if (f[0][2] != '*' && f[0][2] == f[1][2] && f[1][2] == f[2][2]) return true;
+        if (f[0][0] != '*' && f[0][0] == f[1][1] && f[1][1] == f[2][2]) return true;
+        if (f[0][2] != '*' && f[0][2] == f[1][1] && f[1][1] == f[2][0]) return true;
+        return false;
+    }
+
+    @Override
+    public boolean isDraw() {
+        return movesCount == 9;
+    }
+
+    public void printBoard() {
+        char[][] field = board.getField();
+        System.out.println("\n  A B C");
+        for (int i = 0; i < 3; i++) {
+            System.out.print((i + 1) + " ");
+            for (int j = 0; j < 3; j++) {
+                System.out.print(field[i][j] + " ");
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+
+    private String getCoordName(K move) {
+        char[] cols = {'A', 'B', 'C'};
+        return "" + cols[move.getX()] + (move.getY() + 1);
+    }
+}
+
+class Freelancer {
+    private String name;
+    private char symbol;
+
+    public Freelancer(String name, char symbol) {
+        this.name = name;
+        this.symbol = symbol;
+    }
+    public String getName() {
+        return name;
+    }
+    public char getSymbol() {
+        return symbol;
+    }
+}
+
+class DeusExMachina {
+    private char symbol;
+
+    public DeusExMachina(char symbol) {
+        this.symbol = symbol;
+    }
+    public char getSymbol() {
+        return symbol;
+    }
+}
+
+class Board {
+    private char[][] field;
+
+    public Board(int size) {
+        this.field = new char[size][size];
+        for (int i = 0; i < field.length; i++)
+            for (int j = 0; j < field[i].length; j++)
+                field[i][j] = '*';
+    }
+    public char[][] getField() {
+        return field;
+    }
+}
+
+class K {
+    private int x;
+    private int y;
+
+    public K(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+    public int getX() {
+        return x;
+    }
+    public int getY() {
+        return y;
+    }
+}
